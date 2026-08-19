@@ -1,0 +1,63 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  /* Base surfaces */
+  --color-ink: #0b0f17;
+  --color-surface: #131a26;
+  --color-surface-raised: #1a2332;
+  --color-hairline: #232e40;
+
+  /* Text */
+  --color-mist: #a8b3c4;
+  --color-fog: #6b7688;
+  --color-paper: #eef2f8;
+
+  /* Brand + layer accents */
+  --color-electric: #2f6fed;
+  --color-electric-dim: #1d4ed8;
+  --color-verified: #22c55e;
+  --color-flag: #f5a524;
+  --color-dispute: #ef4444;
+
+  --font-display: "Space Grotesk", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, sans-serif;
+  --font-data: "JetBrains Mono", ui-monospace, monospace;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-ink);
+  color: var(--color-paper);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+
+.maplibregl-ctrl-attrib {
+  background: rgba(11, 15, 23, 0.7) !important;
+  color: var(--color-fog) !important;
+}
+.maplibregl-ctrl-attrib a {
+  color: var(--color-mist) !important;
+}
+.maplibregl-ctrl-bottom-right {
+  bottom: 96px !important;
+}
+
+@keyframes pulse-ring {
+  0% { transform: scale(0.6); opacity: 0.9; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+
+.verify-pulse {
+  animation: pulse-ring 1.8s cubic-bezier(0.2, 0.6, 0.4, 1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .verify-pulse { animation: none; }
+}

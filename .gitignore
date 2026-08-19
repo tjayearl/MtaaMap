@@ -1,0 +1,51 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build output
+dist/
+dist-ssr/
+build/
+
+# Environment variables — never commit real secrets
+.env
+.env.local
+.env.*.local
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# Vite
+.vite/
+
+# PWA generated files (auto-built on each build, not source)
+dev-dist/
+
+# Python / FastAPI backend (once added)
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+*.egg-info/
+
+# Database
+*.sqlite3
+*.db
+
+# Testing / coverage
+coverage/
+
+# TypeScript build info
+*.tsbuildinfo
