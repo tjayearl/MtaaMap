@@ -1,10 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
 import * as maplibregl from 'maplibre-gl'
+import { setWorkerUrl } from 'maplibre-gl'
 import type { Map as MLMap, Marker } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
+// Vite-specific import: bundles the MapLibre worker as its own chunk with a
+// resolvable URL. Without this, the worker silently fails in production
+// builds — style/sprite requests succeed, but no vector tiles ever render
+// and no error is thrown. Dev mode works either way, which is why this only
+// showed up on the deployed site.
+import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import type { LayerId, MapPoint } from '../types'
 import { LAYERS } from '../data/mockData'
 
+setWorkerUrl(maplibreWorkerUrl)
 interface MapViewProps {
   points: MapPoint[]
   activeLayer: LayerId
