@@ -38,6 +38,13 @@ body {
   overscroll-behavior: none;
 }
 
+[data-theme='light'] {
+  --color-map-bg: #f4f6f9;
+}
+[data-theme='dark'] {
+  --color-map-bg: #0b0f17;
+}
+
 .maplibregl-ctrl-attrib {
   background: rgba(11, 15, 23, 0.7) !important;
   color: var(--color-fog) !important;

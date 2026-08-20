@@ -1,3 +1,5 @@
+export type ThemeMode = 'dark' | 'light'
+
 export type LayerId = 'neighborhood' | 'prices' | 'potholes'
 
 export interface LayerMeta {
