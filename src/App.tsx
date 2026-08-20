@@ -21,7 +21,7 @@ export default function App() {
   }
 
   return (
-    <div className="relative h-full w-full overflow-hidden bg-ink">
+    <div className="relative h-screen w-screen overflow-hidden bg-ink">
       <MapView points={MAP_POINTS} activeLayer={activeLayer} selectedId={selectedId} onSelect={setSelectedId} />
       <BrandHeader />
       <LayerSwitcher active={activeLayer} onChange={handleLayerChange} />

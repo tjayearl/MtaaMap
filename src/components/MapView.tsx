@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import * as maplibregl from 'maplibre-gl'
 import type { Map as MLMap, Marker } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
@@ -21,22 +21,47 @@ export default function MapView({ points, activeLayer, selectedId, onSelect }: M
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MLMap | null>(null)
   const markersRef = useRef<Map<string, Marker>>(new Map())
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
 
-    const map = new maplibregl.Map({
-      container: containerRef.current,
-      style: BASEMAP_STYLE,
-      center: [36.6705, -1.233],
-      zoom: 14.2,
-      attributionControl: { compact: true },
+    const rect = containerRef.current.getBoundingClientRect()
+    console.log('[MtaaMap] map container size at init:', rect.width, rect.height)
+    if (rect.width === 0 || rect.height === 0) {
+      setLoadError(`Map container has zero size (${rect.width}x${rect.height}) — CSS layout issue.`)
+      return
+    }
+
+    let map: MLMap
+    try {
+      map = new maplibregl.Map({
+        container: containerRef.current,
+        style: BASEMAP_STYLE,
+        center: [36.6705, -1.233],
+        zoom: 14.2,
+        attributionControl: { compact: true },
+      })
+    } catch (err) {
+      console.error('[MtaaMap] failed to construct maplibregl.Map:', err)
+      setLoadError(err instanceof Error ? err.message : String(err))
+      return
+    }
+
+    map.on('load', () => {
+      console.log('[MtaaMap] map "load" event fired — basemap style loaded successfully.')
+    })
+
+    map.on('error', (e) => {
+      console.error('[MtaaMap] maplibre "error" event:', e?.error ?? e)
+      setLoadError(e?.error?.message ?? 'Unknown MapLibre error — check console for the full event object.')
     })
 
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right')
     mapRef.current = map
 
     return () => {
+      if (!map) return
       map.remove()
       mapRef.current = null
     }
@@ -78,5 +103,14 @@ export default function MapView({ points, activeLayer, selectedId, onSelect }: M
     })
   }, [points, activeLayer, selectedId, onSelect])
 
-  return <div ref={containerRef} className="absolute inset-0" />
+  return (
+    <div className="absolute inset-0" style={{ position: 'absolute', inset: 0 }}>
+      <div ref={containerRef} className="absolute inset-0" style={{ position: 'absolute', inset: 0 }} />
+      {loadError && (
+        <div className="absolute inset-x-4 top-20 z-30 rounded-xl bg-dispute/90 p-3 text-[13px] text-white">
+          Map failed to load: {loadError}
+        </div>
+      )}
+    </div>
+  )
 }
