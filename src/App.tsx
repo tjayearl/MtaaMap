@@ -1,7 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import MapView, { type MapViewHandle } from './components/MapView'
-import BrandHeader from './components/BrandHeader'
-import SearchBar from './components/SearchBar'
+import Sidebar from './components/Sidebar'
 import SettingsMenu from './components/SettingsMenu'
 import LayerSwitcher from './components/LayerSwitcher'
 import PointDetailSheet from './components/PointDetailSheet'
@@ -12,6 +11,7 @@ export default function App() {
   const [activeLayer, setActiveLayer] = useState<LayerId>('neighborhood')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [theme, setTheme] = useState<ThemeMode>('dark')
+  const [sidebarOpen, setSidebarOpen] = useState(true)
   const mapRef = useRef<MapViewHandle>(null)
 
   const selectedPoint = useMemo(
@@ -39,12 +39,14 @@ export default function App() {
         theme={theme}
       />
 
-      <div className="pointer-events-none absolute top-0 inset-x-0 z-10 flex flex-col gap-2.5 p-4">
-        <div className="flex items-center justify-between gap-2">
-          <BrandHeader />
-          <SettingsMenu theme={theme} onThemeChange={setTheme} />
-        </div>
-        <SearchBar onResultSelect={handleSearchSelect} />
+      <Sidebar
+        open={sidebarOpen}
+        onToggle={() => setSidebarOpen((o) => !o)}
+        onSearchResult={handleSearchSelect}
+      />
+
+      <div className="pointer-events-none absolute top-4 right-4 z-10">
+        <SettingsMenu theme={theme} onThemeChange={setTheme} />
       </div>
 
       <LayerSwitcher active={activeLayer} onChange={handleLayerChange} />

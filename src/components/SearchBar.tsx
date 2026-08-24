@@ -10,21 +10,25 @@ interface SearchBarProps {
   onResultSelect: (result: SearchResult) => void
 }
 
+interface NominatimItem {
+  display_name: string
+  lat: string
+  lon: string
+}
+
 async function searchPlaces(query: string): Promise<SearchResult[]> {
   const url = new URL('https://nominatim.openstreetmap.org/search')
   url.searchParams.set('q', query)
-  url.searchParams.set('format', 'json')
+  url.searchParams.set('format', 'jsonv2')
   url.searchParams.set('limit', '6')
   url.searchParams.set('countrycodes', 'ke')
 
-  const res = await fetch(url.toString(), {
-    headers: { Accept: 'application/json' },
-  })
-  if (!res.ok) throw new Error(`Nominatim request failed: ${res.status}`)
+  const res = await fetch(url.toString())
+  if (!res.ok) throw new Error(`Search request failed (${res.status})`)
   const data = await res.json()
 
-  return data.map((item: any) => ({
-    label: item.display_name as string,
+  return (data as NominatimItem[]).map((item) => ({
+    label: item.display_name,
     lat: parseFloat(item.lat),
     lng: parseFloat(item.lon),
   }))
@@ -35,25 +39,39 @@ export default function SearchBar({ onResultSelect }: SearchBarProps) {
   const [results, setResults] = useState<SearchResult[]>([])
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
 
     if (query.trim().length < 3) {
-      setResults([])
+      debounceRef.current = setTimeout(() => {
+        setResults([])
+        setError(null)
+      }, 0)
       return
     }
 
     debounceRef.current = setTimeout(async () => {
       setLoading(true)
+      setError(null)
       try {
         const found = await searchPlaces(query.trim())
         setResults(found)
         setOpen(true)
+        if (found.length === 0) {
+          setError('No matches found — try a different spelling or a nearby landmark.')
+        }
       } catch (err) {
         console.error('[MtaaMap] search failed:', err)
         setResults([])
+        setOpen(true)
+        setError(
+          err instanceof TypeError
+            ? 'Search is temporarily unreachable (network/CORS). Try again in a moment.'
+            : 'Search failed. Try again.'
+        )
       } finally {
         setLoading(false)
       }
@@ -71,8 +89,8 @@ export default function SearchBar({ onResultSelect }: SearchBarProps) {
   }
 
   return (
-    <div className="pointer-events-auto relative w-full max-w-md">
-      <div className="flex items-center gap-2 rounded-full bg-ink/85 backdrop-blur-md border border-hairline px-3.5 py-2.5">
+    <div className="pointer-events-auto relative w-full">
+      <div className="flex items-center gap-2 rounded-full bg-surface-raised border border-hairline px-3.5 py-2.5">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" className="shrink-0 text-fog">
           <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
           <path d="M21 21l-4.35-4.35" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -80,17 +98,20 @@ export default function SearchBar({ onResultSelect }: SearchBarProps) {
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          onFocus={() => results.length > 0 && setOpen(true)}
+          onFocus={() => (results.length > 0 || error) && setOpen(true)}
           placeholder="Search a county, town, or place..."
-          className="flex-1 bg-transparent text-[13px] text-paper placeholder:text-fog outline-none"
+          className="flex-1 bg-transparent text-[13px] text-paper placeholder:text-fog outline-none min-w-0"
         />
         {loading && (
-          <span className="h-3 w-3 rounded-full border-2 border-fog border-t-electric animate-spin" />
+          <span className="h-3 w-3 shrink-0 rounded-full border-2 border-fog border-t-electric animate-spin" />
         )}
       </div>
 
-      {open && results.length > 0 && (
-        <div className="absolute top-full mt-1.5 w-full rounded-xl bg-surface border border-hairline overflow-hidden shadow-lg shadow-black/30 max-h-64 overflow-y-auto">
+      {open && (results.length > 0 || error) && (
+        <div className="absolute top-full mt-1.5 w-full rounded-xl bg-surface border border-hairline overflow-hidden shadow-lg shadow-black/30 max-h-64 overflow-y-auto z-30">
+          {error && (
+            <p className="px-3.5 py-2.5 text-[12px] text-flag">{error}</p>
+          )}
           {results.map((r, i) => (
             <button
               key={`${r.lat}-${r.lng}-${i}`}
