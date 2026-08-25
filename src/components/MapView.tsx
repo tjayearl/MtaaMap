@@ -54,7 +54,7 @@ const MapView = forwardRef<MapViewHandle, MapViewProps>(
         map = new maplibregl.Map({
           container: containerRef.current,
           style: BASEMAP_STYLES[theme],
-          center: [36.6705, -1.233],
+          center: [36.8464, -1.1708], // Kirigiti Stadium, Kiambu
           zoom: 14.2,
           attributionControl: { compact: true },
         })
