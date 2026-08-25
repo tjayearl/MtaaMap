@@ -1,12 +1,19 @@
 import SearchBar from './SearchBar'
+import AddPlaceForm from './AddPlaceForm'
+import type { MapPoint } from '../types'
 
 interface SidebarProps {
   open: boolean
   onToggle: () => void
   onSearchResult: (result: { lat: number; lng: number }) => void
+  placing: boolean
+  pendingPin: { lat: number; lng: number } | null
+  onStartPlacing: () => void
+  onCancelPlacing: () => void
+  onSubmitPlace: (point: MapPoint) => void
 }
 
-export default function Sidebar({ open, onToggle, onSearchResult }: SidebarProps) {
+export default function Sidebar({ open, onToggle, onSearchResult, placing, pendingPin, onStartPlacing, onCancelPlacing, onSubmitPlace }: SidebarProps) {
   return (
     <div
       className={[
@@ -49,13 +56,9 @@ export default function Sidebar({ open, onToggle, onSearchResult }: SidebarProps
           <p className="text-[10.5px] uppercase tracking-wide text-fog px-0.5">
             Contribute
           </p>
-          <button
-            disabled
-            className="mt-2 w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-[13px] text-fog bg-surface-raised/50 border border-hairline cursor-not-allowed"
-          >
-            <span className="h-1.5 w-1.5 rounded-full bg-fog" />
-            Add a place — coming soon
-          </button>
+          {!placing && !pendingPin && <button onClick={onStartPlacing} className="mt-2 w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-[13px] text-paper bg-surface-raised border border-hairline hover:border-electric transition-colors"><span className="h-1.5 w-1.5 rounded-full bg-electric" />Add a place</button>}
+          {placing && !pendingPin && <div className="mt-2 rounded-xl bg-surface-raised border border-hairline px-3 py-3"><p className="text-[13px] text-paper">Tap anywhere on the map to place your pin.</p><button onClick={onCancelPlacing} className="mt-2 text-[12px] text-fog hover:text-mist">Cancel</button></div>}
+          {pendingPin && <div className="mt-2"><AddPlaceForm coords={pendingPin} onSubmit={onSubmitPlace} onCancel={onCancelPlacing} /></div>}
           <button
             disabled
             className="mt-1.5 w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-[13px] text-fog bg-surface-raised/50 border border-hairline cursor-not-allowed"

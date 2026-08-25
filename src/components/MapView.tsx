@@ -15,6 +15,9 @@ interface MapViewProps {
   selectedId: string | null
   onSelect: (id: string) => void
   theme: ThemeMode
+  placing: boolean
+  onMapClick: (coords: { lat: number; lng: number }) => void
+  pendingPin: { lat: number; lng: number } | null
 }
 
 export interface MapViewHandle {
@@ -27,10 +30,11 @@ const BASEMAP_STYLES: Record<ThemeMode, string> = {
 }
 
 const MapView = forwardRef<MapViewHandle, MapViewProps>(
-  ({ points, activeLayer, selectedId, onSelect, theme }, ref) => {
+  ({ points, activeLayer, selectedId, onSelect, theme, placing, onMapClick, pendingPin }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null)
     const mapRef = useRef<MLMap | null>(null)
     const markersRef = useRef<Map<string, Marker>>(new Map())
+    const pendingMarkerRef = useRef<Marker | null>(null)
     const [loadError, setLoadError] = useState<string | null>(null)
 
     useImperativeHandle(ref, () => ({
@@ -92,6 +96,29 @@ const MapView = forwardRef<MapViewHandle, MapViewProps>(
     useEffect(() => {
       const map = mapRef.current
       if (!map) return
+      const handleClick = (e: maplibregl.MapMouseEvent) => onMapClick({ lat: e.lngLat.lat, lng: e.lngLat.lng })
+      map.getCanvas().style.cursor = placing ? 'crosshair' : ''
+      if (placing) map.on('click', handleClick)
+      return () => {
+        map.off('click', handleClick)
+      }
+    }, [placing, onMapClick])
+
+    useEffect(() => {
+      const map = mapRef.current
+      if (!map) return
+      pendingMarkerRef.current?.remove()
+      pendingMarkerRef.current = null
+      if (pendingPin) {
+        const el = document.createElement('div')
+        el.style.cssText = 'width:22px;height:22px;border-radius:999px 999px 999px 2px;transform:rotate(45deg);background:#2f6fed;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.4)'
+        pendingMarkerRef.current = new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat([pendingPin.lng, pendingPin.lat]).addTo(map)
+      }
+    }, [pendingPin])
+
+    useEffect(() => {
+      const map = mapRef.current
+      if (!map) return
 
       const renderMarkers = () => {
         markersRef.current.forEach((marker) => marker.remove())
@@ -142,6 +169,7 @@ const MapView = forwardRef<MapViewHandle, MapViewProps>(
             Map failed to load: {loadError}
           </div>
         )}
+        {placing && <div className="pointer-events-none absolute top-4 left-1/2 -translate-x-1/2 z-30 rounded-full bg-electric text-white text-[12.5px] font-medium px-3.5 py-1.5 shadow-lg">Tap the map to place your pin</div>}
       </div>
     )
   }
