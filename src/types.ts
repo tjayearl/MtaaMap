@@ -39,6 +39,7 @@ export interface MapPoint {
   area: string
   lastVerified: Contribution
   disputed?: boolean
+  reportReason?: string
   prices?: PriceItem[]
   neighborhood?: NeighborhoodRating
 }

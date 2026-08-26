@@ -3,6 +3,8 @@ import type { MapPoint } from '../types'
 interface PointDetailSheetProps {
   point: MapPoint | null
   onClose: () => void
+  onConfirm: (pointId: string) => void
+  onReport: () => void
 }
 
 const ratingTone: Record<string, string> = {
@@ -17,7 +19,7 @@ const ratingTone: Record<string, string> = {
   unknown: 'text-fog',
 }
 
-export default function PointDetailSheet({ point, onClose }: PointDetailSheetProps) {
+export default function PointDetailSheet({ point, onClose, onConfirm, onReport }: PointDetailSheetProps) {
   const open = point !== null
 
   return (
@@ -60,10 +62,16 @@ export default function PointDetailSheet({ point, onClose }: PointDetailSheetPro
               </p>
               {point.disputed && (
                 <span className="ml-auto rounded-full bg-dispute/15 text-dispute text-[11px] font-medium px-2 py-0.5">
-                  Price disputed
+                  Recently corrected
                 </span>
               )}
             </div>
+
+            {point.disputed && point.reportReason && (
+              <div className="mt-2.5 rounded-xl bg-dispute/10 border border-dispute/30 px-3 py-2.5">
+                <p className="text-[12px] text-dispute leading-relaxed">{point.reportReason}</p>
+              </div>
+            )}
 
             <div className="mt-4 border-t border-hairline pt-4">
               {point.prices && (
@@ -107,10 +115,10 @@ export default function PointDetailSheet({ point, onClose }: PointDetailSheetPro
             </div>
 
             <div className="mt-4 flex gap-2 pb-1">
-              <button className="flex-1 rounded-xl bg-electric text-white text-[13px] font-medium py-2.5">
+              <button onClick={() => onConfirm(point.id)} className="flex-1 rounded-xl bg-electric text-white text-[13px] font-medium py-2.5">
                 This matches what I see
               </button>
-              <button className="flex-1 rounded-xl bg-surface-raised text-paper text-[13px] font-medium py-2.5 border border-hairline">
+              <button onClick={onReport} className="flex-1 rounded-xl bg-surface-raised text-paper text-[13px] font-medium py-2.5 border border-hairline">
                 Report different info
               </button>
             </div>
