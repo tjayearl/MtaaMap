@@ -1,0 +1,100 @@
+import enum
+import uuid
+from datetime import datetime
+
+from geoalchemy2 import Geography
+from sqlalchemy import DateTime, Enum, ForeignKey, Index, Integer, String, Text, func
+from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.db import Base
+
+
+class PointLayer(str, enum.Enum):
+    neighborhood = "neighborhood"
+    prices = "prices"
+    potholes = "potholes"
+
+
+class UserStatus(str, enum.Enum):
+    active = "active"
+    warned = "warned"
+    suspended = "suspended"
+
+
+class ReportStatus(str, enum.Enum):
+    pending = "pending"
+    accepted = "accepted"
+    rejected = "rejected"
+
+
+class ContributionType(str, enum.Enum):
+    created = "created"
+    confirmed = "confirmed"
+    disputed = "disputed"
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    email: Mapped[str | None] = mapped_column(String(320), unique=True)
+    phone: Mapped[str | None] = mapped_column(String(32), unique=True)
+    password_hash: Mapped[str] = mapped_column(String(255))
+    display_name: Mapped[str] = mapped_column(String(120))
+    trust_score: Mapped[int] = mapped_column(Integer, default=100, nullable=False)
+    status: Mapped[UserStatus] = mapped_column(Enum(UserStatus, name="user_status"), default=UserStatus.active, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    points: Mapped[list["Point"]] = relationship(back_populates="creator")
+
+
+class Point(Base):
+    __tablename__ = "points"
+    __table_args__ = (Index("ix_points_location", "location", postgresql_using="gist"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    layer: Mapped[PointLayer] = mapped_column(Enum(PointLayer, name="point_layer"), nullable=False)
+    name: Mapped[str] = mapped_column(String(160), nullable=False)
+    area: Mapped[str] = mapped_column(String(160), nullable=False)
+    location = mapped_column(Geography(geometry_type="POINT", srid=4326), nullable=False)
+    created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    photo_url: Mapped[str | None] = mapped_column(String(2_048))
+
+    creator: Mapped[User] = relationship(back_populates="points")
+    attributes: Mapped[list["PointAttribute"]] = relationship(back_populates="point", cascade="all, delete-orphan")
+
+
+class PointAttribute(Base):
+    __tablename__ = "point_attributes"
+    __table_args__ = (Index("ix_point_attributes_key_value", "key", "value"),)
+
+    point_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("points.id", ondelete="CASCADE"), primary_key=True)
+    key: Mapped[str] = mapped_column(String(80), primary_key=True)
+    value: Mapped[str] = mapped_column(Text, nullable=False)
+    unit: Mapped[str | None] = mapped_column(String(32))
+
+    point: Mapped[Point] = relationship(back_populates="attributes")
+
+
+class Report(Base):
+    __tablename__ = "reports"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    point_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("points.id", ondelete="CASCADE"), nullable=False)
+    submitted_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    proposed_changes: Mapped[dict | None] = mapped_column(JSONB)
+    status: Mapped[ReportStatus] = mapped_column(Enum(ReportStatus, name="report_status"), default=ReportStatus.pending, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class Contribution(Base):
+    __tablename__ = "contributions"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    point_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("points.id", ondelete="CASCADE"), nullable=False)
+    type: Mapped[ContributionType] = mapped_column(Enum(ContributionType, name="contribution_type"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
