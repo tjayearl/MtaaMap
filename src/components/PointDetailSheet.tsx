@@ -5,6 +5,7 @@ interface PointDetailSheetProps {
   onClose: () => void
   onConfirm: (pointId: string) => void
   onReport: () => void
+  onDiscuss: (pointId: string) => void
 }
 
 const ratingTone: Record<string, string> = {
@@ -19,7 +20,7 @@ const ratingTone: Record<string, string> = {
   unknown: 'text-fog',
 }
 
-export default function PointDetailSheet({ point, onClose, onConfirm, onReport }: PointDetailSheetProps) {
+export default function PointDetailSheet({ point, onClose, onConfirm, onReport, onDiscuss }: PointDetailSheetProps) {
   const open = point !== null
 
   return (
@@ -118,7 +119,12 @@ export default function PointDetailSheet({ point, onClose, onConfirm, onReport }
               <button onClick={() => onConfirm(point.id)} className="flex-1 rounded-xl bg-electric text-white text-[13px] font-medium py-2.5">
                 This matches what I see
               </button>
-              <button onClick={onReport} className="flex-1 rounded-xl bg-surface-raised text-paper text-[13px] font-medium py-2.5 border border-hairline">
+              <button onClick={() => onDiscuss(point.id)} className="flex-1 rounded-xl bg-surface-raised text-paper text-[13px] font-medium py-2.5 border border-hairline">
+                What&apos;s your opinion?
+              </button>
+            </div>
+            <div className="mt-2 pb-1">
+              <button onClick={onReport} className="w-full rounded-xl bg-surface-raised text-paper text-[13px] font-medium py-2.5 border border-hairline">
                 Report different info
               </button>
             </div>

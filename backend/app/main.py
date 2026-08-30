@@ -10,8 +10,10 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.config import settings
 from app.db import get_db
-from app.models import Contribution, ContributionType, Point, PointAttribute, Report, User
+from app.models import Comment, Contribution, ContributionType, Point, PointAttribute, Report, User
 from app.schemas import (
+    CommentCreate,
+    CommentResponse,
     ContributionResponse,
     LoginRequest,
     PointCreate,
@@ -78,19 +80,45 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
 
 @app.get("/points", response_model=list[PointResponse])
 def list_points(
-    layer: str,
+    layer: str | None = None,
     lat: float = Query(ge=-90, le=90),
     lng: float = Query(ge=-180, le=180),
     radius_km: float = Query(default=2, gt=0, le=100),
     filter: str | None = None,
+    has_comments: bool = False,
+    sort: str | None = None,
     db: Session = Depends(get_db),
 ):
-    origin = ST_SetSRID(ST_MakePoint(lng, lat), 4326).cast(Geography)
-    distance = ST_Distance(Point.location, origin)
-    query = select(Point).options(joinedload(Point.attributes)).where(Point.layer == layer, distance <= radius_km * 1000)
+    query = select(Point).options(joinedload(Point.attributes))
+
+    if layer is not None:
+        query = query.where(Point.layer == layer)
+
+    if has_comments:
+        query = query.join(Comment).where(Comment.point_id == Point.id)
+        query = query.group_by(Point.id)
+
+    if lat is not None and lng is not None:
+        origin = ST_SetSRID(ST_MakePoint(lng, lat), 4326).cast(Geography)
+        distance = ST_Distance(Point.location, origin)
+        query = query.where(distance <= radius_km * 1000)
+        order_by = distance
+    else:
+        order_by = Point.created_at.desc()
+
+    if has_comments:
+        if sort == "recent_activity":
+            order_by = func.coalesce(Point.last_comment_at, Point.created_at).desc()
+        elif sort == "popular":
+            order_by = func.count(Comment.id).desc()
+        else:
+            order_by = func.coalesce(Point.last_comment_at, Point.created_at).desc()
+
     if filter:
         query = query.join(PointAttribute).where(PointAttribute.key.ilike(f"%{filter}%") | PointAttribute.value.ilike(f"%{filter}%"))
-    points = db.scalars(query.order_by(distance)).unique().all()
+
+    query = query.order_by(order_by)
+    points = db.scalars(query.distinct()).all()
     return [point_response(point, db) for point in points]
 
 
@@ -141,6 +169,42 @@ def confirm_point(point_id: UUID, current_user: User = Depends(get_current_user)
     db.commit()
     db.refresh(contribution)
     return contribution
+
+
+@app.get("/points/{point_id}/comments", response_model=list[CommentResponse])
+def list_comments_for_point(point_id: UUID, db: Session = Depends(get_db)):
+    if not db.get(Point, point_id):
+        raise HTTPException(status_code=404, detail="Point not found")
+    return db.scalars(
+        select(Comment).where(Comment.point_id == point_id).order_by(Comment.created_at.asc())
+    ).all()
+
+
+@app.post("/points/{point_id}/comments", response_model=CommentResponse, status_code=status.HTTP_201_CREATED)
+def create_comment(point_id: UUID, payload: CommentCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if not db.get(Point, point_id):
+        raise HTTPException(status_code=404, detail="Point not found")
+
+    if payload.parent_comment_id is not None:
+        parent = db.get(Comment, payload.parent_comment_id)
+        if parent is None or parent.point_id != point_id:
+            raise HTTPException(status_code=400, detail="Parent comment not found for this point")
+
+    comment = Comment(
+        point_id=point_id,
+        parent_comment_id=payload.parent_comment_id,
+        user_id=current_user.id,
+        body=payload.body,
+    )
+    db.add(comment)
+    db.flush()
+
+    point = db.get(Point, point_id)
+    point.last_comment_at = comment.created_at
+
+    db.commit()
+    db.refresh(comment)
+    return comment
 
 
 @app.get("/users/me", response_model=UserResponse)

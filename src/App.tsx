@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar'
 import SettingsMenu from './components/SettingsMenu'
 import LayerSwitcher from './components/LayerSwitcher'
 import PointDetailSheet from './components/PointDetailSheet'
+import CommunityPanel from './components/CommunityPanel'
 import { MAP_POINTS as INITIAL_POINTS } from './data/mockData'
 import type { LayerId, MapPoint, PriceItem, ThemeMode } from './types'
 
@@ -16,6 +17,8 @@ export default function App() {
   const [placing, setPlacing] = useState(false)
   const [pendingPin, setPendingPin] = useState<{ lat: number; lng: number } | null>(null)
   const [reporting, setReporting] = useState(false)
+  const [communityOpen, setCommunityOpen] = useState(false)
+  const [communityPointId, setCommunityPointId] = useState<string | null>(null)
   const mapRef = useRef<MapViewHandle>(null)
 
   const selectedPoint = useMemo(
@@ -102,6 +105,10 @@ export default function App() {
         open={sidebarOpen}
         onToggle={() => setSidebarOpen((o) => !o)}
         onSearchResult={handleSearchSelect}
+        onOpenCommunity={() => {
+          setCommunityOpen(true)
+          setCommunityPointId(selectedId ?? null)
+        }}
         placing={placing}
         pendingPin={pendingPin}
         onStartPlacing={handleStartPlacing}
@@ -127,6 +134,25 @@ export default function App() {
           setSelectedId(null)
           setSidebarOpen(true)
           handleStartReporting()
+        }}
+        onDiscuss={(pointId) => {
+          setCommunityOpen(true)
+          setCommunityPointId(pointId)
+          setSelectedId(pointId)
+        }}
+      />
+
+      <CommunityPanel
+        isOpen={communityOpen}
+        initialPointId={communityPointId ?? selectedId}
+        onClose={() => setCommunityOpen(false)}
+        onSelectPoint={(pointId) => {
+          setSelectedId(pointId)
+          setCommunityPointId(pointId)
+          const point = points.find((p) => p.id === pointId)
+          if (point) {
+            mapRef.current?.flyTo(point.lat, point.lng, 15)
+          }
         }}
       />
     </div>

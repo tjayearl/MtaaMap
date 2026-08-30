@@ -30,6 +30,24 @@ export interface Contribution {
   confirmations: number
 }
 
+export interface CommunityComment {
+  id: string
+  author: string
+  body: string
+  createdAt: string
+  parentId?: string
+}
+
+export interface CommunityThread {
+  pointId: string
+  title: string
+  area: string
+  commentCount: number
+  latestSnippet: string
+  latestActivity: string
+  comments: CommunityComment[]
+}
+
 export interface MapPoint {
   id: string
   lat: number

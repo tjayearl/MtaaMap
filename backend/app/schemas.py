@@ -92,3 +92,20 @@ class ContributionResponse(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class CommentCreate(BaseModel):
+    body: str = Field(min_length=1, max_length=4000)
+    parent_comment_id: UUID | None = None
+
+
+class CommentResponse(BaseModel):
+    id: UUID
+    point_id: UUID
+    parent_comment_id: UUID | None
+    user_id: UUID
+    body: str
+    created_at: datetime
+    flagged_count: int
+
+    model_config = {"from_attributes": True}

@@ -7,6 +7,7 @@ interface SidebarProps {
   open: boolean
   onToggle: () => void
   onSearchResult: (result: { lat: number; lng: number }) => void
+  onOpenCommunity: () => void
   placing: boolean
   pendingPin: { lat: number; lng: number } | null
   onStartPlacing: () => void
@@ -20,7 +21,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({
-  open, onToggle, onSearchResult, placing, pendingPin, onStartPlacing, onCancelPlacing, onSubmitPlace,
+  open, onToggle, onSearchResult, onOpenCommunity, placing, pendingPin, onStartPlacing, onCancelPlacing, onSubmitPlace,
   points, reporting, onStartReporting, onCancelReporting, onSubmitReport,
 }: SidebarProps) {
   const idle = !placing && !pendingPin && !reporting
@@ -48,35 +49,43 @@ export default function Sidebar({
         <SearchBar onResultSelect={onSearchResult} />
 
         <div className="border-t border-hairline pt-3">
-          <p className="text-[10.5px] uppercase tracking-wide text-fog px-0.5">Contribute</p>
-          {idle && (
-            <>
-              <button onClick={onStartPlacing} className="mt-2 w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-[13px] text-paper bg-surface-raised border border-hairline hover:border-electric transition-colors">
-                <span className="h-1.5 w-1.5 rounded-full bg-electric" />
-                Add a place
-              </button>
-              <button onClick={onStartReporting} className="mt-1.5 w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-[13px] text-paper bg-surface-raised border border-hairline hover:border-dispute transition-colors">
-                <span className="h-1.5 w-1.5 rounded-full bg-dispute" />
-                Report incorrect info
-              </button>
-            </>
-          )}
+          <p className="text-[10.5px] uppercase tracking-wide text-fog px-0.5">Community</p>
+          <button onClick={onOpenCommunity} className="mt-2 w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-[13px] text-paper bg-surface-raised border border-hairline hover:border-electric transition-colors">
+            <span className="h-1.5 w-1.5 rounded-full bg-electric" />
+            Browse active discussions
+          </button>
+
+          <div className="mt-4 border-t border-hairline pt-3">
+            <p className="text-[10.5px] uppercase tracking-wide text-fog px-0.5">Contribute</p>
+            {idle && (
+              <>
+                <button onClick={onStartPlacing} className="mt-2 w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-[13px] text-paper bg-surface-raised border border-hairline hover:border-electric transition-colors">
+                  <span className="h-1.5 w-1.5 rounded-full bg-electric" />
+                  Add a place
+                </button>
+                <button onClick={onStartReporting} className="mt-1.5 w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-[13px] text-paper bg-surface-raised border border-hairline hover:border-dispute transition-colors">
+                  <span className="h-1.5 w-1.5 rounded-full bg-dispute" />
+                  Report incorrect info
+                </button>
+              </>
+            )}
           {placing && !pendingPin && (
             <div className="mt-2 rounded-xl bg-surface-raised border border-hairline px-3 py-3">
               <p className="text-[13px] text-paper">Tap anywhere on the map to place your pin.</p>
               <button onClick={onCancelPlacing} className="mt-2 text-[12px] text-fog hover:text-mist">Cancel</button>
             </div>
           )}
-          {pendingPin && (
-            <div className="mt-2">
-              <AddPlaceForm coords={pendingPin} onSubmit={onSubmitPlace} onCancel={onCancelPlacing} />
-            </div>
-          )}
-          {reporting && (
-            <div className="mt-2">
-              <ReportForm points={points} onSubmit={onSubmitReport} onCancel={onCancelReporting} />
-            </div>
-          )}
+            {pendingPin && (
+              <div className="mt-2">
+                <AddPlaceForm coords={pendingPin} onSubmit={onSubmitPlace} onCancel={onCancelPlacing} />
+              </div>
+            )}
+            {reporting && (
+              <div className="mt-2">
+                <ReportForm points={points} onSubmit={onSubmitReport} onCancel={onCancelReporting} />
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

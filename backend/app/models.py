@@ -61,9 +61,11 @@ class Point(Base):
     created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     photo_url: Mapped[str | None] = mapped_column(String(2_048))
+    last_comment_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     creator: Mapped[User] = relationship(back_populates="points")
     attributes: Mapped[list["PointAttribute"]] = relationship(back_populates="point", cascade="all, delete-orphan")
+    comments: Mapped[list["Comment"]] = relationship(back_populates="point", cascade="all, delete-orphan")
 
 
 class PointAttribute(Base):
@@ -98,3 +100,20 @@ class Contribution(Base):
     point_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("points.id", ondelete="CASCADE"), nullable=False)
     type: Mapped[ContributionType] = mapped_column(Enum(ContributionType, name="contribution_type"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class Comment(Base):
+    __tablename__ = "comments"
+    __table_args__ = (Index("ix_comments_point_id_created_at", "point_id", "created_at"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    point_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("points.id", ondelete="CASCADE"), nullable=False, index=True)
+    parent_comment_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("comments.id", ondelete="CASCADE"), nullable=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    flagged_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    point: Mapped[Point] = relationship(back_populates="comments")
+    author: Mapped[User] = relationship()
+    parent: Mapped["Comment | None"] = relationship(remote_side="Comment.id")
