@@ -10,6 +10,3 @@ export default defineConfig({
     VitePWA({}),
   ],
   optimizeDeps: {
-    exclude: ['maplibre-gl']
-  }
-})

@@ -31,6 +31,7 @@ class UserResponse(BaseModel):
     phone: str | None
     trust_score: int
     status: UserStatus
+    is_admin: bool
 
     model_config = {"from_attributes": True}
 
@@ -109,3 +110,38 @@ class CommentResponse(BaseModel):
     flagged_count: int
 
     model_config = {"from_attributes": True}
+
+
+class UserAdminResponse(BaseModel):
+    """Extended user response for admin endpoints."""
+    id: UUID
+    display_name: str
+    email: str | None
+    phone: str | None
+    trust_score: int
+    status: UserStatus
+    is_admin: bool
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class AdminActionRequest(BaseModel):
+    """Request body for admin actions on users."""
+    reason: str = Field(min_length=1, max_length=500)
+
+
+class DirectionsRequest(BaseModel):
+    """Request for directions to a point."""
+    start_lat: float = Field(ge=-90, le=90)
+    start_lng: float = Field(ge=-180, le=180)
+    end_lat: float = Field(ge=-90, le=90)
+    end_lng: float = Field(ge=-180, le=180)
+
+
+class DirectionsResponse(BaseModel):
+    """Response with directions/route information."""
+    distance_km: float
+    duration_minutes: float
+    polyline: str | None = None
+    instructions: list[str] = Field(default_factory=list)
