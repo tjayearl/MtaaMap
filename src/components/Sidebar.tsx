@@ -4,6 +4,8 @@ import AddPlaceForm from './AddPlaceForm'
 import ReportForm from './ReportForm'
 import NearbyList from './NearbyList'
 import PriceFilters from './PriceFilters'
+import { MatatuFinderModal } from './MatatuFinderModal'
+import { LeaderboardComponent } from './LeaderboardComponent'
 import type { LayerId, MapPoint, PriceItem } from '../types'
 
 interface SidebarProps {
@@ -29,7 +31,7 @@ interface SidebarProps {
   onPriceFiltersChange: (filters: string[]) => void
 }
 
-type SidebarTab = 'browse' | 'nearby' | 'filters'
+type SidebarTab = 'browse' | 'nearby' | 'filters' | 'leaderboard' | 'matatu'
 
 export default function Sidebar({
   open, onToggle, onSearchResult, onOpenCommunity, placing, pendingPin, onStartPlacing, onCancelPlacing, onSubmitPlace,
@@ -37,6 +39,7 @@ export default function Sidebar({
   activeLayer, selectedId, onSelectPoint, mapCenter, onPriceFiltersChange,
 }: SidebarProps) {
   const [tab, setTab] = useState<SidebarTab>('browse')
+  const [showMatatuModal, setShowMatatuModal] = useState(false)
   const idle = !placing && !pendingPin && !reporting
 
   return (
@@ -78,17 +81,17 @@ export default function Sidebar({
 
         <div className="border-t border-hairline pt-3">
           <p className="text-[10.5px] uppercase tracking-wide text-fog px-0.5">Explore</p>
-          <div className="mt-2 flex gap-1.5">
-            {(['browse', 'nearby', ...(activeLayer === 'prices' ? ['filters'] : [])] as Array<'browse' | 'nearby' | 'filters'>).map((t) => (
+          <div className="mt-2 flex gap-1.5 flex-wrap">
+            {(['browse', 'nearby', 'leaderboard', 'matatu', ...(activeLayer === 'prices' ? ['filters'] : [])] as Array<SidebarTab>).map((t) => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
                 className={[
-                  'flex-1 rounded-lg px-2.5 py-1.5 text-[11px] font-medium border transition-colors',
+                  'rounded-lg px-2.5 py-1.5 text-[11px] font-medium border transition-colors',
                   tab === t ? 'bg-electric/15 border-electric text-paper' : 'bg-surface-raised border-hairline text-mist hover:border-electric/60',
                 ].join(' ')}
               >
-                {t === 'browse' ? 'Browse' : t === 'nearby' ? 'Nearby' : 'Filter'}
+                {t === 'browse' ? 'Browse' : t === 'nearby' ? 'Nearby' : t === 'leaderboard' ? 'Top' : t === 'matatu' ? 'Matatu' : 'Filter'}
               </button>
             ))}
           </div>
@@ -143,6 +146,35 @@ export default function Sidebar({
                 onFilterChange={onPriceFiltersChange}
               />
             )}
+
+            {tab === 'leaderboard' && idle && (
+              <div>
+                <p className="text-[10.5px] uppercase tracking-wide text-fog mb-2">Top Contributors</p>
+                <LeaderboardComponent metric="contributions" limit={15} />
+              </div>
+            )}
+
+            {tab === 'matatu' && idle && (
+              <div>
+                <button
+                  onClick={() => setShowMatatuModal(true)}
+                  className="w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-[13px] text-paper bg-surface-raised border border-hairline hover:border-electric transition-colors"
+                >
+                  <span className="h-1.5 w-1.5 rounded-full bg-electric" />
+                  Find matatu routes
+                </button>
+              </div>
+            )}
+
+            {/* Matatu Finder Modal */}
+            <MatatuFinderModal
+              isOpen={showMatatuModal}
+              onClose={() => setShowMatatuModal(false)}
+              mapCenter={mapCenter}
+              onSelectStage={(stage) => {
+                onSearchResult({ lat: stage.lat, lng: stage.lng })
+              }}
+            />
           </div>
         </div>
       </div>

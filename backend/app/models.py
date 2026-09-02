@@ -34,6 +34,16 @@ class ContributionType(str, enum.Enum):
     disputed = "disputed"
 
 
+class RewardType(str, enum.Enum):
+    free_premium = "free_premium"
+    physical_gift = "physical_gift"
+
+
+class RewardStatus(str, enum.Enum):
+    pending = "pending"
+    fulfilled = "fulfilled"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -118,3 +128,60 @@ class Comment(Base):
     point: Mapped[Point] = relationship(back_populates="comments")
     author: Mapped[User] = relationship()
     parent: Mapped["Comment | None"] = relationship(remote_side="Comment.id")
+
+
+class Rating(Base):
+    __tablename__ = "ratings"
+    __table_args__ = (Index("ix_ratings_point_user", "point_id", "user_id", unique=True),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    point_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("points.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    score: Mapped[int] = mapped_column(Integer, nullable=False)  # 1-5
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    point: Mapped[Point] = relationship()
+    user: Mapped[User] = relationship()
+
+
+class Reward(Base):
+    __tablename__ = "rewards"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    type: Mapped[RewardType] = mapped_column(Enum(RewardType, name="reward_type"), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    period_start: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    period_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    status: Mapped[RewardStatus] = mapped_column(Enum(RewardStatus, name="reward_status"), default=RewardStatus.pending, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    user: Mapped[User] = relationship()
+
+
+class MatatuRoute(Base):
+    __tablename__ = "matatu_routes"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(160), nullable=False)
+    route_number: Mapped[str | None] = mapped_column(String(32))
+    created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    creator: Mapped[User] = relationship()
+    stages: Mapped[list["MatatuStage"]] = relationship(back_populates="route", cascade="all, delete-orphan")
+
+
+class MatatuStage(Base):
+    __tablename__ = "matatu_stages"
+    __table_args__ = (Index("ix_matatu_stages_location", "lat", "lng"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    route_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("matatu_routes.id", ondelete="CASCADE"), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(160), nullable=False)
+    lat: Mapped[float] = mapped_column(nullable=False)
+    lng: Mapped[float] = mapped_column(nullable=False)
+    notes: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    route: Mapped[MatatuRoute] = relationship(back_populates="stages")

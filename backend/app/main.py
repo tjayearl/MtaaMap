@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.config import settings
 from app.db import get_db
 from app.logging_config import get_logger, init_logging
-from app.models import Comment, Contribution, ContributionType, Point, PointAttribute, Report, User, UserStatus
+from app.models import Comment, Contribution, ContributionType, Point, PointAttribute, Rating, Report, User, UserStatus, Reward, MatatuRoute, MatatuStage
 from app.schemas import (
     AdminActionRequest,
     CommentCreate,
@@ -23,12 +23,21 @@ from app.schemas import (
     ContributionResponse,
     DirectionsRequest,
     DirectionsResponse,
+    HeatmapResponse,
+    LeaderboardEntryResponse,
     LoginRequest,
+    MatatuRouteCreate,
+    MatatuRouteResponse,
+    MatatuRouteSearchResult,
     PointCreate,
     PointResponse,
+    RatingAverage,
+    RatingCreate,
+    RatingResponse,
     RegisterRequest,
     ReportCreate,
     ReportResponse,
+    RewardResponse,
     TokenResponse,
     UserAdminResponse,
     UserResponse,
@@ -373,3 +382,244 @@ def get_directions(request, payload: DirectionsRequest):
         duration_minutes=round(duration, 2),
         instructions=[]
     )
+
+
+# ============================================================================
+# RATING SYSTEM ENDPOINTS
+# ============================================================================
+
+@app.post("/points/{point_id}/ratings", response_model=RatingResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("10/minute")
+def create_rating(request, point_id: UUID, payload: RatingCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Create or update a rating for a point."""
+    if not db.get(Point, point_id):
+        raise HTTPException(status_code=404, detail="Point not found")
+    
+    rating = db.scalar(select(Rating).where((Rating.point_id == point_id) & (Rating.user_id == current_user.id)))
+    if rating:
+        rating.score = payload.score
+    else:
+        rating = Rating(point_id=point_id, user_id=current_user.id, score=payload.score)
+        db.add(rating)
+    
+    db.commit()
+    db.refresh(rating)
+    return rating
+
+
+@app.get("/points/{point_id}/rating", response_model=RatingResponse | None)
+def get_user_rating(point_id: UUID, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Get current user's rating for a point."""
+    return db.scalar(select(Rating).where((Rating.point_id == point_id) & (Rating.user_id == current_user.id)))
+
+
+@app.delete("/points/{point_id}/rating", status_code=204)
+def delete_user_rating(point_id: UUID, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Delete current user's rating for a point."""
+    rating = db.scalar(select(Rating).where((Rating.point_id == point_id) & (Rating.user_id == current_user.id)))
+    if rating:
+        db.delete(rating)
+        db.commit()
+    return None
+
+
+@app.get("/points/{point_id}/ratings/average", response_model=RatingAverage)
+def get_average_rating(point_id: UUID, db: Session = Depends(get_db)):
+    """Get average rating for a point."""
+    if not db.get(Point, point_id):
+        raise HTTPException(status_code=404, detail="Point not found")
+    
+    result = db.execute(
+        select(
+            func.avg(Rating.score).label("avg_score"),
+            func.count(Rating.id).label("count")
+        ).where(Rating.point_id == point_id)
+    ).one()
+    
+    return RatingAverage(
+        point_id=point_id,
+        average_score=float(result.avg_score) if result.avg_score else 0,
+        total_ratings=result.count or 0
+    )
+
+
+# ============================================================================
+# HEATMAP ENDPOINTS
+# ============================================================================
+
+@app.get("/heatmap/data", response_model=HeatmapResponse)
+def get_heatmap_data(layer: str, metric: str = "electricity", db: Session = Depends(get_db)):
+    """Get heatmap data for infrastructure issues (electricity, water, etc.)."""
+    from app.schemas import HeatmapDataPoint
+    
+    valid_metrics = ["electricity", "water_availability", "water_potability", "roads", "security"]
+    if metric not in valid_metrics:
+        raise HTTPException(status_code=400, detail=f"Invalid metric. Must be one of: {', '.join(valid_metrics)}")
+    
+    # Get all points in this layer with their attributes
+    points = db.scalars(select(Point).where(Point.layer == layer).options(joinedload(Point.attributes))).all()
+    
+    heatmap_points = []
+    severity_map = {"reliable": 0.2, "good": 0.2, "paved": 0.2, "safe_to_drink": 0.2,
+                    "unreliable": 0.8, "fair": 0.5, "concerning": 0.9, "unpaved": 0.6, "mixed": 0.4, "needs_treatment": 0.7, "unknown": 0.5}
+    
+    for point in points:
+        attr_map = {attr.key: attr.value for attr in point.attributes}
+        if metric in attr_map:
+            value = attr_map[metric]
+            intensity = severity_map.get(value, 0.5)
+            
+            # Parse coordinates
+            coords = db.scalar(select(func.ST_AsGeoJSON(point.location)))
+            if coords:
+                geometry = json.loads(coords)
+                heatmap_points.append(HeatmapDataPoint(lat=geometry["coordinates"][1], lng=geometry["coordinates"][0], intensity=intensity))
+    
+    return HeatmapResponse(layer=layer, metric=metric, data=heatmap_points)
+
+
+# ============================================================================
+# MATATU TRANSIT ENDPOINTS
+# ============================================================================
+
+@app.get("/matatu-routes", response_model=list[MatatuRouteResponse])
+def list_matatu_routes(limit: int = Query(100, ge=1, le=500), db: Session = Depends(get_db)):
+    """List all matatu routes."""
+    routes = db.scalars(
+        select(MatatuRoute).options(joinedload(MatatuRoute.stages)).order_by(MatatuRoute.created_at.desc()).limit(limit)
+    ).all()
+    return routes
+
+
+@app.get("/matatu-routes/search", response_model=list[MatatuRouteSearchResult])
+def search_matatu_routes(q: str, lat: float | None = None, lng: float | None = None, db: Session = Depends(get_db)):
+    """Search matatu routes by name."""
+    routes = db.scalars(
+        select(MatatuRoute).where(MatatuRoute.name.ilike(f"%{q}%")).options(joinedload(MatatuRoute.stages))
+    ).all()
+    
+    results = []
+    for route in routes:
+        for stage in route.stages:
+            distance_km = None
+            if lat is not None and lng is not None:
+                distance_km = haversine_distance(lat, lng, stage.lat, stage.lng)
+            
+            results.append(MatatuRouteSearchResult(
+                route_id=route.id,
+                route_name=route.name,
+                stage_id=stage.id,
+                stage_name=stage.name,
+                lat=stage.lat,
+                lng=stage.lng,
+                distance_km=distance_km
+            ))
+    
+    # Sort by distance if provided
+    if lat is not None and lng is not None:
+        results.sort(key=lambda x: x.distance_km or float('inf'))
+    
+    return results[:50]  # Limit to 50 results
+
+
+@app.post("/matatu-routes", response_model=MatatuRouteResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("5/minute")
+def create_matatu_route(request, payload: MatatuRouteCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Create a new matatu route."""
+    route = MatatuRoute(
+        name=payload.name,
+        route_number=payload.route_number,
+        created_by=current_user.id,
+        stages=[
+            MatatuStage(name=stage.name, lat=stage.lat, lng=stage.lng, notes=stage.notes)
+            for stage in payload.stages
+        ]
+    )
+    db.add(route)
+    db.commit()
+    db.refresh(route)
+    return route
+
+
+@app.get("/matatu-routes/{route_id}", response_model=MatatuRouteResponse)
+def get_matatu_route(route_id: UUID, db: Session = Depends(get_db)):
+    """Get a matatu route with all stages."""
+    route = db.scalar(
+        select(MatatuRoute).where(MatatuRoute.id == route_id).options(joinedload(MatatuRoute.stages))
+    )
+    if not route:
+        raise HTTPException(status_code=404, detail="Route not found")
+    return route
+
+
+@app.get("/matatu-routes/{route_id}/nearby", response_model=list[MatatuRouteSearchResult])
+def get_nearby_stages(route_id: UUID, lat: float = Query(ge=-90, le=90), lng: float = Query(ge=-180, le=180), radius_km: float = Query(default=2, gt=0, le=100), db: Session = Depends(get_db)):
+    """Get stages near a location for a specific route."""
+    route = db.scalar(select(MatatuRoute).where(MatatuRoute.id == route_id).options(joinedload(MatatuRoute.stages)))
+    if not route:
+        raise HTTPException(status_code=404, detail="Route not found")
+    
+    results = []
+    for stage in route.stages:
+        distance_km = haversine_distance(lat, lng, stage.lat, stage.lng)
+        if distance_km <= radius_km:
+            results.append(MatatuRouteSearchResult(
+                route_id=route.id,
+                route_name=route.name,
+                stage_id=stage.id,
+                stage_name=stage.name,
+                lat=stage.lat,
+                lng=stage.lng,
+                distance_km=distance_km
+            ))
+    
+    results.sort(key=lambda x: x.distance_km)
+    return results
+
+
+# ============================================================================
+# LEADERBOARD ENDPOINTS
+# ============================================================================
+
+@app.get("/leaderboard", response_model=list[LeaderboardEntryResponse])
+def get_leaderboard(metric: str = Query("contributions", regex="^(contributions|rating)$"), limit: int = Query(10, ge=1, le=100), db: Session = Depends(get_db)):
+    """Get leaderboard of top contributors."""
+    # Count confirmed contributions per user
+    contrib_query = (
+        select(
+            User.id,
+            User.display_name,
+            User.trust_score,
+            func.count(Contribution.id).label("confirmed_count")
+        )
+        .outerjoin(Contribution, (Contribution.user_id == User.id) & (Contribution.type == ContributionType.confirmed))
+        .group_by(User.id, User.display_name, User.trust_score)
+    )
+    
+    if metric == "rating":
+        # Join with average ratings
+        contrib_query = contrib_query.outerjoin(
+            Rating,
+            Rating.user_id == User.id
+        ).add_columns(func.coalesce(func.avg(Rating.score), 0).label("avg_rating"))
+    else:
+        contrib_query = contrib_query.add_columns(func.cast(0, db.Integer).label("avg_rating"))
+    
+    results = db.execute(
+        contrib_query.order_by(
+            func.count(Contribution.id).desc() if metric == "contributions" else func.avg(Rating.score).desc()
+        ).limit(limit)
+    ).all()
+    
+    leaderboard = []
+    for rank, row in enumerate(results, 1):
+        leaderboard.append(LeaderboardEntryResponse(
+            rank=rank,
+            user_id=row.id,
+            display_name=row.display_name,
+            confirmed_contributions=row.confirmed_count or 0,
+            average_rating=float(row.avg_rating) if row.avg_rating else 0.0,
+            trust_score=row.trust_score
+        ))
+    
+    return leaderboard

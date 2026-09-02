@@ -1,5 +1,7 @@
 export type ThemeMode = 'dark' | 'light'
 
+export type UUID = string
+
 export type LayerId = 'neighborhood' | 'prices' | 'potholes'
 
 export interface LayerMeta {
@@ -18,10 +20,13 @@ export interface PriceItem {
 
 export interface NeighborhoodRating {
   electricity: 'reliable' | 'unreliable' | 'unknown'
-  water: 'reliable' | 'unreliable' | 'unknown'
+  water_availability: 'reliable' | 'unreliable' | 'unknown'
+  water_potability: 'safe_to_drink' | 'needs_treatment' | 'unknown'
   roads: 'paved' | 'unpaved' | 'mixed'
   security: 'good' | 'fair' | 'concerning'
   note: string
+  /** @deprecated Use water_availability and water_potability instead */
+  water?: 'reliable' | 'unreliable' | 'unknown'
 }
 
 export interface Contribution {

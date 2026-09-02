@@ -1,4 +1,8 @@
-import type { MapPoint } from '../types'
+import { useState } from 'react'
+import type { Map as MapLibreGLMap } from 'maplibre-gl'
+import type { MapPoint, UUID } from '../types'
+import { RatingComponent } from './RatingComponent'
+import { DirectionsFlow } from './DirectionsFlow'
 
 interface PointDetailSheetProps {
   point: MapPoint | null
@@ -6,6 +10,7 @@ interface PointDetailSheetProps {
   onConfirm: (pointId: string) => void
   onReport: () => void
   onDiscuss: (pointId: string) => void
+  map?: MapLibreGLMap | null
 }
 
 const ratingTone: Record<string, string> = {
@@ -20,8 +25,10 @@ const ratingTone: Record<string, string> = {
   unknown: 'text-fog',
 }
 
-export default function PointDetailSheet({ point, onClose, onConfirm, onReport, onDiscuss }: PointDetailSheetProps) {
+export default function PointDetailSheet({ point, onClose, onConfirm, onReport, onDiscuss, map }: PointDetailSheetProps) {
   const open = point !== null
+  const [showDirections, setShowDirections] = useState(false)
+  const [userRating, setUserRating] = useState<number | null>(null)
 
   return (
     <div
@@ -95,7 +102,7 @@ export default function PointDetailSheet({ point, onClose, onConfirm, onReport, 
                     {(
                       [
                         ['Electricity', point.neighborhood.electricity],
-                        ['Water', point.neighborhood.water],
+                        ['Water Available', point.neighborhood.water_availability],
                         ['Roads', point.neighborhood.roads],
                         ['Security', point.neighborhood.security],
                       ] as const
@@ -107,27 +114,56 @@ export default function PointDetailSheet({ point, onClose, onConfirm, onReport, 
                         </dd>
                       </div>
                     ))}
+                    <div className="rounded-xl bg-surface-raised px-3 py-2">
+                      <dt className="text-[10.5px] uppercase tracking-wide text-fog">Water Quality</dt>
+                      <dd className={`text-[13px] font-medium capitalize mt-0.5 ${ratingTone[point.neighborhood.water_potability]}`}>
+                        {point.neighborhood.water_potability === 'safe_to_drink' ? 'Safe to drink' : point.neighborhood.water_potability === 'needs_treatment' ? 'Needs treatment' : 'Unknown'}
+                      </dd>
+                    </div>
                   </dl>
                   <p className="text-[13px] text-mist leading-relaxed mt-3">
                     {point.neighborhood.note}
                   </p>
                 </div>
               )}
+
+              {/* Rating Component */}
+              <RatingComponent
+                pointId={point.id as UUID}
+                averageScore={4.5}
+                totalRatings={12}
+                userRating={userRating}
+                onRate={setUserRating}
+              />
             </div>
 
             <div className="mt-4 flex gap-2 pb-1">
               <button onClick={() => onConfirm(point.id)} className="flex-1 rounded-xl bg-electric text-white text-[13px] font-medium py-2.5">
                 This matches what I see
               </button>
+              <button onClick={() => setShowDirections(true)} className="flex-1 rounded-xl bg-surface-raised text-paper text-[13px] font-medium py-2.5 border border-hairline">
+                Get Directions
+              </button>
+            </div>
+            <div className="mt-2 pb-1 flex gap-2">
               <button onClick={() => onDiscuss(point.id)} className="flex-1 rounded-xl bg-surface-raised text-paper text-[13px] font-medium py-2.5 border border-hairline">
                 What&apos;s your opinion?
               </button>
-            </div>
-            <div className="mt-2 pb-1">
-              <button onClick={onReport} className="w-full rounded-xl bg-surface-raised text-paper text-[13px] font-medium py-2.5 border border-hairline">
+              <button onClick={onReport} className="flex-1 rounded-xl bg-surface-raised text-paper text-[13px] font-medium py-2.5 border border-hairline">
                 Report different info
               </button>
             </div>
+
+            {/* Directions Flow Modal */}
+            {showDirections && (
+              <DirectionsFlow
+                map={map || null}
+                pointLat={point.lat}
+                pointLng={point.lng}
+                pointName={point.name}
+                onClose={() => setShowDirections(false)}
+              />
+            )}
           </div>
         )}
       </div>

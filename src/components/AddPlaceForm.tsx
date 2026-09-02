@@ -15,7 +15,8 @@ export default function AddPlaceForm({ coords, onSubmit, onCancel }: AddPlaceFor
   const [area, setArea] = useState('')
   const [note, setNote] = useState('')
   const [electricity, setElectricity] = useState<NeighborhoodRating['electricity']>('unknown')
-  const [water, setWater] = useState<NeighborhoodRating['water']>('unknown')
+  const [waterAvailability, setWaterAvailability] = useState<NeighborhoodRating['water_availability']>('unknown')
+  const [waterPotability, setWaterPotability] = useState<NeighborhoodRating['water_potability']>('unknown')
   const [roads, setRoads] = useState<NeighborhoodRating['roads']>('mixed')
   const [security, setSecurity] = useState<NeighborhoodRating['security']>('fair')
   const [priceRows, setPriceRows] = useState<PriceItem[]>([emptyPriceRow()])
@@ -42,7 +43,7 @@ export default function AddPlaceForm({ coords, onSubmit, onCancel }: AddPlaceFor
     const point: MapPoint =
       layer === 'prices'
         ? { ...base, prices: priceRows.filter((r) => r.name.trim().length > 0) }
-        : { ...base, neighborhood: { electricity, water, roads, security, note: note.trim() } }
+        : { ...base, neighborhood: { electricity, water_availability: waterAvailability, water_potability: waterPotability, roads, security, note: note.trim() } }
 
     onSubmit(point)
   }
@@ -109,7 +110,7 @@ export default function AddPlaceForm({ coords, onSubmit, onCancel }: AddPlaceFor
           <div className="grid grid-cols-2 gap-2">
             {([
               ['Electricity', electricity, setElectricity, ['reliable', 'unreliable', 'unknown']],
-              ['Water', water, setWater, ['reliable', 'unreliable', 'unknown']],
+              ['Water Available', waterAvailability, setWaterAvailability, ['reliable', 'unreliable', 'unknown']],
               ['Roads', roads, setRoads, ['paved', 'unpaved', 'mixed']],
               ['Security', security, setSecurity, ['good', 'fair', 'concerning']],
             ] as const).map(([label, value, setter, options]) => (
@@ -121,6 +122,16 @@ export default function AddPlaceForm({ coords, onSubmit, onCancel }: AddPlaceFor
               </div>
             ))}
           </div>
+
+          <div>
+            <label className="text-[10.5px] uppercase tracking-wide text-fog">Water Drinkable?</label>
+            <select value={waterPotability} onChange={(e) => setWaterPotability(e.target.value as never)} className="mt-1 w-full rounded-lg bg-surface-raised border border-hairline px-2 py-1.5 text-[12.5px] text-paper outline-none focus:border-electric">
+              <option value="unknown">Not sure</option>
+              <option value="safe_to_drink">Safe to drink directly</option>
+              <option value="needs_treatment">Needs dispenser/treatment</option>
+            </select>
+          </div>
+
           <div>
             <label className="text-[10.5px] uppercase tracking-wide text-fog">Notes</label>
             <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} placeholder="What's it actually like here — anything worth knowing before someone moves nearby?" className="mt-1 w-full rounded-lg bg-surface-raised border border-hairline px-2.5 py-2 text-[12.5px] text-paper placeholder:text-fog outline-none focus:border-electric resize-none" />

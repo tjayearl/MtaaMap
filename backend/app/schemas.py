@@ -3,7 +3,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, model_validator
 
-from app.models import ContributionType, PointLayer, ReportStatus, UserStatus
+from app.models import ContributionType, PointLayer, ReportStatus, RewardStatus, RewardType, UserStatus
 
 
 class RegisterRequest(BaseModel):
@@ -145,3 +145,115 @@ class DirectionsResponse(BaseModel):
     duration_minutes: float
     polyline: str | None = None
     instructions: list[str] = Field(default_factory=list)
+
+
+class RatingCreate(BaseModel):
+    """Create a rating for a point."""
+    score: int = Field(ge=1, le=5)
+
+
+class RatingResponse(BaseModel):
+    """Rating response."""
+    id: UUID
+    point_id: UUID
+    user_id: UUID
+    score: int
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class RatingAverage(BaseModel):
+    """Average rating for a point."""
+    point_id: UUID
+    average_score: float
+    total_ratings: int
+
+
+class RewardResponse(BaseModel):
+    """Reward response."""
+    id: UUID
+    user_id: UUID
+    type: RewardType
+    description: str
+    period_start: datetime | None
+    period_end: datetime | None
+    status: RewardStatus
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class MatatuStageResponse(BaseModel):
+    """Matatu stage response."""
+    id: UUID
+    route_id: UUID
+    name: str
+    lat: float
+    lng: float
+    notes: str | None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class MatatuRouteCreate(BaseModel):
+    """Create a matatu route."""
+    name: str = Field(min_length=1, max_length=160)
+    route_number: str | None = Field(None, max_length=32)
+    stages: list["MatatuStageCreate"] = Field(default_factory=list)
+
+
+class MatatuStageCreate(BaseModel):
+    """Create a matatu stage."""
+    name: str = Field(min_length=1, max_length=160)
+    lat: float = Field(ge=-90, le=90)
+    lng: float = Field(ge=-180, le=180)
+    notes: str | None = None
+
+
+class MatatuRouteResponse(BaseModel):
+    """Matatu route response."""
+    id: UUID
+    name: str
+    route_number: str | None
+    created_by: UUID
+    stages: list[MatatuStageResponse]
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class MatatuRouteSearchResult(BaseModel):
+    """Search result for matatu routes/stages."""
+    route_id: UUID
+    route_name: str
+    stage_id: UUID
+    stage_name: str
+    lat: float
+    lng: float
+    distance_km: float | None = None
+
+
+class HeatmapDataPoint(BaseModel):
+    """Single point in heatmap data."""
+    lat: float
+    lng: float
+    intensity: float  # 0-1, based on severity/density
+
+
+class HeatmapResponse(BaseModel):
+    """Heatmap data response."""
+    layer: str
+    metric: str
+    data: list[HeatmapDataPoint]
+
+
+class LeaderboardEntryResponse(BaseModel):
+    """Leaderboard entry."""
+    rank: int
+    user_id: UUID
+    display_name: str
+    confirmed_contributions: int
+    average_rating: float
+    trust_score: int

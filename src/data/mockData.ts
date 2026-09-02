@@ -38,7 +38,8 @@ export const MAP_POINTS: MapPoint[] = [
     lastVerified: { reporterInitial: 'T', timeAgo: '1h ago', confirmations: 1 },
     neighborhood: {
       electricity: 'unknown',
-      water: 'unknown',
+      water_availability: 'unknown',
+      water_potability: 'unknown',
       roads: 'mixed',
       security: 'good',
       note: "Replace with a real, specific note about this exact spot — what it's actually like day to day.",
