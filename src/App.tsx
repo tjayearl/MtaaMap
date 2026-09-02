@@ -5,6 +5,7 @@ import SettingsMenu from './components/SettingsMenu'
 import LayerSwitcher from './components/LayerSwitcher'
 import PointDetailSheet from './components/PointDetailSheet'
 import CommunityPanel from './components/CommunityPanel'
+import FirstTimeIntro from './components/FirstTimeIntro'
 import { MAP_POINTS as INITIAL_POINTS } from './data/mockData'
 import type { LayerId, MapPoint, PriceItem, ThemeMode } from './types'
 
@@ -19,12 +20,24 @@ export default function App() {
   const [reporting, setReporting] = useState(false)
   const [communityOpen, setCommunityOpen] = useState(false)
   const [communityPointId, setCommunityPointId] = useState<string | null>(null)
+  const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null)
+  const [priceFilters, setPriceFilters] = useState<string[]>([])
   const mapRef = useRef<MapViewHandle>(null)
 
   const selectedPoint = useMemo(
     () => points.find((p) => p.id === selectedId) ?? null,
     [points, selectedId]
   )
+
+  const filteredPoints = useMemo(() => {
+    if (priceFilters.length === 0) return points
+    if (activeLayer !== 'prices') return points
+    return points.filter((p) => {
+      if (p.layer !== 'prices') return true
+      if (!p.prices) return false
+      return p.prices.some((price) => priceFilters.includes(price.name))
+    })
+  }, [points, priceFilters, activeLayer])
 
   const handleLayerChange = (id: LayerId) => {
     setActiveLayer(id)
@@ -91,7 +104,7 @@ export default function App() {
     <div className="relative h-screen w-screen overflow-hidden bg-ink" data-theme={theme}>
       <MapView
         ref={mapRef}
-        points={points}
+        points={filteredPoints}
         activeLayer={activeLayer}
         selectedId={selectedId}
         onSelect={setSelectedId}
@@ -99,6 +112,7 @@ export default function App() {
         placing={placing}
         onMapClick={handleMapClick}
         pendingPin={pendingPin}
+        onCenterChange={setMapCenter}
       />
 
       <Sidebar
@@ -115,10 +129,16 @@ export default function App() {
         onCancelPlacing={handleCancelPlacing}
         onSubmitPlace={handleSubmitPlace}
         points={points}
+        filteredPoints={filteredPoints}
         reporting={reporting}
         onStartReporting={handleStartReporting}
         onCancelReporting={handleCancelReporting}
         onSubmitReport={handleSubmitReport}
+        activeLayer={activeLayer}
+        selectedId={selectedId}
+        onSelectPoint={setSelectedId}
+        mapCenter={mapCenter}
+        onPriceFiltersChange={setPriceFilters}
       />
 
       <div className="pointer-events-none absolute top-4 right-4 z-10">
@@ -155,6 +175,8 @@ export default function App() {
           }
         }}
       />
+
+      <FirstTimeIntro onDismiss={() => {}} />
     </div>
   )
 }

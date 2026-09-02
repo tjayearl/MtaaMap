@@ -18,10 +18,12 @@ interface MapViewProps {
   placing: boolean
   onMapClick: (coords: { lat: number; lng: number }) => void
   pendingPin: { lat: number; lng: number } | null
+  onCenterChange?: (center: { lat: number; lng: number }) => void
 }
 
 export interface MapViewHandle {
   flyTo: (lat: number, lng: number, zoom?: number) => void
+  getCenter: () => { lat: number; lng: number } | null
 }
 
 const BASEMAP_STYLES: Record<ThemeMode, string> = {
@@ -30,17 +32,19 @@ const BASEMAP_STYLES: Record<ThemeMode, string> = {
 }
 
 const MapView = forwardRef<MapViewHandle, MapViewProps>(
-  ({ points, activeLayer, selectedId, onSelect, theme, placing, onMapClick, pendingPin }, ref) => {
+  ({ points, activeLayer, selectedId, onSelect, theme, placing, onMapClick, pendingPin, onCenterChange }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null)
     const mapRef = useRef<MLMap | null>(null)
     const markersRef = useRef<Map<string, Marker>>(new Map())
     const pendingMarkerRef = useRef<Marker | null>(null)
     const [loadError, setLoadError] = useState<string | null>(null)
+    const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null)
 
     useImperativeHandle(ref, () => ({
       flyTo: (lat, lng, zoom = 15) => {
         mapRef.current?.flyTo({ center: [lng, lat], zoom, duration: 1200 })
       },
+      getCenter: () => mapCenter,
     }))
 
     useEffect(() => {
@@ -70,6 +74,15 @@ const MapView = forwardRef<MapViewHandle, MapViewProps>(
 
       map.on('load', () => {
         console.log('[MtaaMap] map "load" event fired — basemap style loaded successfully.')
+        const center = map.getCenter()
+        setMapCenter({ lat: center.lat, lng: center.lng })
+        onCenterChange?.({ lat: center.lat, lng: center.lng })
+      })
+
+      map.on('move', () => {
+        const center = map.getCenter()
+        setMapCenter({ lat: center.lat, lng: center.lng })
+        onCenterChange?.({ lat: center.lat, lng: center.lng })
       })
 
       map.on('error', (e) => {

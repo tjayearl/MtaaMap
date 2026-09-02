@@ -1,7 +1,10 @@
+import { useState } from 'react'
 import SearchBar from './SearchBar'
 import AddPlaceForm from './AddPlaceForm'
 import ReportForm from './ReportForm'
-import type { MapPoint, PriceItem } from '../types'
+import NearbyList from './NearbyList'
+import PriceFilters from './PriceFilters'
+import type { LayerId, MapPoint, PriceItem } from '../types'
 
 interface SidebarProps {
   open: boolean
@@ -14,16 +17,26 @@ interface SidebarProps {
   onCancelPlacing: () => void
   onSubmitPlace: (point: MapPoint) => void
   points: MapPoint[]
+  filteredPoints: MapPoint[]
   reporting: boolean
   onStartReporting: () => void
   onCancelReporting: () => void
   onSubmitReport: (pointId: string, reason: string, correctedPrices?: PriceItem[]) => void
+  activeLayer: LayerId
+  selectedId: string | null
+  onSelectPoint: (id: string) => void
+  mapCenter: { lat: number; lng: number } | null
+  onPriceFiltersChange: (filters: string[]) => void
 }
+
+type SidebarTab = 'browse' | 'nearby' | 'filters'
 
 export default function Sidebar({
   open, onToggle, onSearchResult, onOpenCommunity, placing, pendingPin, onStartPlacing, onCancelPlacing, onSubmitPlace,
-  points, reporting, onStartReporting, onCancelReporting, onSubmitReport,
+  points, filteredPoints, reporting, onStartReporting, onCancelReporting, onSubmitReport,
+  activeLayer, selectedId, onSelectPoint, mapCenter, onPriceFiltersChange,
 }: SidebarProps) {
+  const [tab, setTab] = useState<SidebarTab>('browse')
   const idle = !placing && !pendingPin && !reporting
 
   return (
@@ -40,10 +53,17 @@ export default function Sidebar({
       </button>
 
       <div className="flex flex-col gap-4 p-4 h-full overflow-y-auto">
-        <div className="flex items-center gap-2">
-          <span className="h-2 w-2 rounded-full bg-electric shadow-[0_0_10px_2px_rgba(47,111,237,0.7)]" />
-          <span className="font-display font-semibold text-[16px] tracking-tight text-paper">MtaaMap</span>
-          <span className="text-[11px] font-body text-fog border-l border-hairline pl-2 ml-0.5">Mtaa Yetu</span>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <span className="h-2 w-2 rounded-full bg-electric shadow-[0_0_10px_2px_rgba(47,111,237,0.7)]" />
+            <div className="min-w-0">
+              <span className="font-display font-semibold text-[16px] tracking-tight text-paper block truncate">MtaaMap</span>
+              <span className="text-[11px] font-body text-fog">Mtaa Yetu</span>
+            </div>
+          </div>
+          <button className="flex-shrink-0 rounded-lg px-2.5 py-1.5 text-[11px] font-medium text-paper bg-electric/20 border border-electric/40 hover:border-electric transition-colors whitespace-nowrap">
+            Sign in
+          </button>
         </div>
 
         <SearchBar onResultSelect={onSearchResult} />
@@ -54,12 +74,29 @@ export default function Sidebar({
             <span className="h-1.5 w-1.5 rounded-full bg-electric" />
             Browse active discussions
           </button>
+        </div>
 
-          <div className="mt-4 border-t border-hairline pt-3">
-            <p className="text-[10.5px] uppercase tracking-wide text-fog px-0.5">Contribute</p>
-            {idle && (
+        <div className="border-t border-hairline pt-3">
+          <p className="text-[10.5px] uppercase tracking-wide text-fog px-0.5">Explore</p>
+          <div className="mt-2 flex gap-1.5">
+            {(['browse', 'nearby', ...(activeLayer === 'prices' ? ['filters'] : [])] as Array<'browse' | 'nearby' | 'filters'>).map((t) => (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                className={[
+                  'flex-1 rounded-lg px-2.5 py-1.5 text-[11px] font-medium border transition-colors',
+                  tab === t ? 'bg-electric/15 border-electric text-paper' : 'bg-surface-raised border-hairline text-mist hover:border-electric/60',
+                ].join(' ')}
+              >
+                {t === 'browse' ? 'Browse' : t === 'nearby' ? 'Nearby' : 'Filter'}
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-2">
+            {tab === 'browse' && idle && (
               <>
-                <button onClick={onStartPlacing} className="mt-2 w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-[13px] text-paper bg-surface-raised border border-hairline hover:border-electric transition-colors">
+                <button onClick={onStartPlacing} className="w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-[13px] text-paper bg-surface-raised border border-hairline hover:border-electric transition-colors">
                   <span className="h-1.5 w-1.5 rounded-full bg-electric" />
                   Add a place
                 </button>
@@ -69,21 +106,42 @@ export default function Sidebar({
                 </button>
               </>
             )}
-          {placing && !pendingPin && (
-            <div className="mt-2 rounded-xl bg-surface-raised border border-hairline px-3 py-3">
-              <p className="text-[13px] text-paper">Tap anywhere on the map to place your pin.</p>
-              <button onClick={onCancelPlacing} className="mt-2 text-[12px] text-fog hover:text-mist">Cancel</button>
-            </div>
-          )}
+
+            {placing && !pendingPin && (
+              <div className="rounded-xl bg-surface-raised border border-hairline px-3 py-3">
+                <p className="text-[13px] text-paper">Tap anywhere on the map to place your pin.</p>
+                <button onClick={onCancelPlacing} className="mt-2 text-[12px] text-fog hover:text-mist">Cancel</button>
+              </div>
+            )}
+
             {pendingPin && (
-              <div className="mt-2">
+              <div>
                 <AddPlaceForm coords={pendingPin} onSubmit={onSubmitPlace} onCancel={onCancelPlacing} />
               </div>
             )}
+
             {reporting && (
-              <div className="mt-2">
+              <div>
                 <ReportForm points={points} onSubmit={onSubmitReport} onCancel={onCancelReporting} />
               </div>
+            )}
+
+            {tab === 'nearby' && idle && (
+              <NearbyList
+                points={filteredPoints}
+                activeLayer={activeLayer}
+                mapCenter={mapCenter}
+                selectedId={selectedId}
+                onSelect={onSelectPoint}
+                onFlyTo={(lat, lng) => onSearchResult({ lat, lng })}
+              />
+            )}
+
+            {tab === 'filters' && idle && activeLayer === 'prices' && (
+              <PriceFilters
+                points={points}
+                onFilterChange={onPriceFiltersChange}
+              />
             )}
           </div>
         </div>
